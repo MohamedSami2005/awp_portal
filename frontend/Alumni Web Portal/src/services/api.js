@@ -1,158 +1,178 @@
 import axios from 'axios';
 
-// --- BASE URL ---
-const API_BASE_URL = 'http://localhost:8000/api';
+// Point this to your Django Server URL
+const API_BASE_URL = 'http://127.0.0.1:8000/api';
 
-// --- MOCK DATA for PUBLIC ---
-let MOCK_ALUMNI = [
-  { id: 1, name: 'Jane Doe', department: 'CSE', year_of_passing: 2022, location: 'Chennai' },
-  { id: 2, name: 'John Smith', department: 'ECE', year_of_passing: 2021, location: 'Bangalore' },
-  { id: 3, name: 'Priya Kumar', department: 'CSE', year_of_passing: 2022, location: 'Mumbai' },
-];
+// Create an Axios instance
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
 
-let MOCK_ACHIEVEMENTS = [
-  { id: 1, title: 'Forbes 30 Under 30', alumni_name: 'Jane Doe' },
-  { id: 2, title: 'Founded successful AI startup', alumni_name: 'John Smith' },
-];
-
-const MOCK_EVENTS = [
-  { id: 1, title: 'Alumni Annual Meetup 2025', date: '2025-12-15', location: 'Campus Auditorium' },
-  { id: 2, title: 'Webinar: AI in Modern Tech', date: '2025-11-20', location: 'Online (Zoom)' },
-];
-
-// --- MOCK DATA for ADMIN ---
-let MOCK_PENDING_ALUMNI = [
-  { id: 4, name: 'Rajesh Gupta', department: 'MECH', year_of_passing: 2023, location: 'Delhi', achievements: 'Won national robotics competition.' },
-  { id: 5, name: 'Aisha Khan', department: 'CSE', year_of_passing: 2022, location: 'Pune', achievements: 'Interned at Google.' },
-];
+// Automatically add the Admin Token to requests if it exists
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('adminToken');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 // === PUBLIC API FUNCTIONS ===
 
 export const getAlumniList = async (filters) => {
-  console.log('Fetching alumni with filters:', filters);
-  await new Promise((resolve) => setTimeout(resolve, 500));
-
-  let filteredAlumni = MOCK_ALUMNI;
-
-  // Search by name
-  if (filters?.search) {
-    filteredAlumni = filteredAlumni.filter((a) =>
-      a.name.toLowerCase().includes(filters.search.toLowerCase())
-    );
+  try {
+    const response = await api.get('/alumni/list/', { params: filters });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching alumni:", error);
+    return [];
   }
-
-  // Filter by department
-  if (filters?.department) {
-    filteredAlumni = filteredAlumni.filter(
-      (a) => a.department.toLowerCase() === filters.department.toLowerCase()
-    );
-  }
-  
-  // Filter by year
-  if (filters?.year_of_passing) {
-    filteredAlumni = filteredAlumni.filter(
-      (a) => a.year_of_passing == filters.year_of_passing
-    );
-  }
-  
-  // Filter by location
-  if (filters?.location) {
-    filteredAlumni = filteredAlumni.filter(
-      (a) => a.location.toLowerCase() === filters.location.toLowerCase()
-    );
-  }
-
-  return filteredAlumni;
 };
 
 export const registerAlumni = async (alumniData) => {
-  console.log('Registering alumni:', alumniData);
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-  
-  const newAlum = { id: Math.random(), ...alumniData };
-  MOCK_PENDING_ALUMNI.push(newAlum);
-  
-  return {
-    message: 'Registration successful! Waiting for admin approval.',
-    data: newAlum,
-  };
+  try {
+    // We use 'multipart/form-data' because we might be uploading an image
+    const response = await api.post('/alumni/register/', alumniData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error registering:", error);
+    throw error;
+  }
 };
 
 export const getAchievements = async () => {
-  console.log('Fetching achievements...');
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  return MOCK_ACHIEVEMENTS;
+  try {
+    const response = await api.get('/achievements/');
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching achievements:", error);
+    return [];
+  }
 };
 
 export const getEvents = async () => {
-  console.log('Fetching events...');
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  return MOCK_EVENTS;
+  try {
+    const response = await api.get('/events/');
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching events:", error);
+    return [];
+  }
 };
 
 // === ADMIN API FUNCTIONS ===
 
 export const adminLogin = async (username, password) => {
-  console.log('Attempting admin login...');
-  await new Promise((resolve) => setTimeout(resolve, 500));
-
-  if (username === 'admin' && password === 'admin123') {
-    const mockToken = 'fake-admin-token-12345';
-    localStorage.setItem('adminToken', mockToken);
-    return { success: true, token: mockToken };
-  } else {
-    return { success: false, message: 'Invalid username or password' };
+  try {
+    const response = await api.post('/admin-login/', { username, password });
+    if (response.data.success) {
+      localStorage.setItem('adminToken', response.data.token);
+    }
+    return response.data;
+  } catch (error) {
+    return { success: false, message: "Server error during login" };
   }
 };
 
 export const getPendingAlumni = async () => {
-  console.log('Fetching pending alumni...');
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  return MOCK_PENDING_ALUMNI;
+  try {
+    const response = await api.get('/alumni/pending/');
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching pending alumni:", error);
+    return [];
+  }
 };
 
 export const approveAlumni = async (alumniId) => {
-  console.log(`Approving alumni ${alumniId}...`);
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  
-  const approvedAlum = MOCK_PENDING_ALUMNI.find(a => a.id === alumniId);
-  MOCK_PENDING_ALUMNI = MOCK_PENDING_ALUMNI.filter(a => a.id !== alumniId);
-  
-  if (approvedAlum) {
-    MOCK_ALUMNI.push(approvedAlum);
+  try {
+    const response = await api.post(`/alumni/approve/${alumniId}/`);
+    return response.data;
+  } catch (error) {
+    console.error("Error approving alumni:", error);
   }
-  return { success: true, message: 'Alumni approved' };
 };
 
 export const rejectAlumni = async (alumniId) => {
-  console.log(`Rejecting alumni ${alumniId}...`);
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  
-  MOCK_PENDING_ALUMNI = MOCK_PENDING_ALUMNI.filter(a => a.id !== alumniId);
-  return { success: true, message: 'Alumni rejected' };
+  try {
+    const response = await api.post(`/alumni/reject/${alumniId}/`);
+    return response.data;
+  } catch (error) {
+    console.error("Error rejecting alumni:", error);
+  }
+};
+
+export const deleteAchievement = async (achievementId) => {
+  try {
+    const response = await api.delete(`/achievements/delete/${achievementId}/`);
+    return response.data;
+  } catch (error) {
+    console.error("Error deleting achievement:", error);
+  }
+};
+
+export const getAdminStats = async () => {
+  try {
+    const response = await api.get('/admin/stats/');
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching stats:", error);
+    return { totalAlumni: 0, pendingApprovals: 0, totalAchievements: 0, totalEvents: 0 };
+  }
 };
 
 export const adminLogout = () => {
   localStorage.removeItem('adminToken');
 };
+// ... inside src/services/api.js
 
-export const getAdminStats = async () => {
-  console.log('Fetching admin stats...');
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  return {
-    totalAlumni: MOCK_ALUMNI.length,
-    pendingApprovals: MOCK_PENDING_ALUMNI.length,
-    totalAchievements: MOCK_ACHIEVEMENTS.length,
-    totalEvents: MOCK_EVENTS.length,
-  };
+// --- ADD THESE TO THE ADMIN SECTION ---
+
+export const createEvent = async (eventData) => {
+  try {
+    // We use FormData because events have images (banners)
+    const response = await api.post('/events/create/', eventData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error creating event:", error);
+    throw error;
+  }
 };
 
-export const deleteAchievement = async (achievementId) => {
-  console.log(`Deleting achievement ${achievementId}...`);
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  
-  MOCK_ACHIEVEMENTS = MOCK_ACHIEVEMENTS.filter(
-    (ach) => ach.id !== achievementId
-  );
-  return { success: true, message: 'Achievement deleted' };
+export const deleteEvent = async (eventId) => {
+  try {
+    const response = await api.delete(`/events/delete/${eventId}/`);
+    return response.data;
+  } catch (error) {
+    console.error("Error deleting event:", error);
+  }
+};
+
+
+export const createAchievement = async (data) => {
+  try {
+    const response = await api.post('/achievements/create/', data);
+    return response.data;
+  } catch (error) {
+    console.error("Error creating achievement:", error);
+    throw error;
+  }
+};
+// ... inside src/services/api.js
+
+export const getAlumniById = async (id) => {
+  try {
+    const response = await api.get(`/alumni/${id}/`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching alumni detail:", error);
+    throw error;
+  }
 };
